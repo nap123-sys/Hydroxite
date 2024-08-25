@@ -1,0 +1,13 @@
+[package]
+name = "Rust"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+eframe = { version = "0.22.0", features = ["default_fonts", "glow"] }
+egui = "0.22.0"
+rfd = "0.11.0"
+syntect = "5.0"
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3.9", features = ["winuser", "windef"] }
