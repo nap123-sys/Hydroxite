@@ -9,8 +9,8 @@ use syntect::util::LinesWithEndings;
 
 enum VimMode {
     Normal,
-    Insert,
-    Command,
+    // Insert,
+    // Command,
 }
 
 struct SplashScreen {
@@ -34,7 +34,6 @@ struct TextEditor {
     splash_screen: SplashScreen,
     vim_mode: bool,
     vim_state: VimMode,
-    vim_command: String,
     current_dir: Option<PathBuf>,
     selected_file: Option<PathBuf>,
     expanded_folders: HashMap<PathBuf, bool>,
@@ -58,7 +57,6 @@ impl Default for TextEditor {
             splash_screen: SplashScreen::default(),
             vim_mode: false,
             vim_state: VimMode::Normal,
-            vim_command: String::new(),
             current_dir: None,
             selected_file: None,
             expanded_folders: HashMap::new(),
@@ -377,28 +375,30 @@ impl TextEditor {
         let response = ui.add(editor);
 
         if response.changed() {
-            if let Some(cursor_range) = response.cursor_range() {
-                if let Some(cursor_pos) = cursor_range.primary.ccursor.index {
-                    if cursor_pos > 0 {
-                        let last_char = self.content.chars().nth(cursor_pos - 1);
-                        if let Some(ch) = last_char {
-                            let to_insert = match ch {
-                                '(' => Some(')'),
-                                '[' => Some(']'),
-                                '{' => Some('}'),
-                                '"' => Some('"'),
-                                '\'' => Some('\''),
-                                _ => None,
-                            };
+            // Get the cursor position from the UI state
+            if let Some(cursor_pos) = ui.input(|i| i.events.iter().find_map(|e| {
+                if let egui::Event::Text(_text) = e {
+                    Some(self.content.len())
+                } else {
+                    None
+                }
+            })) {
+                if cursor_pos > 0 {
+                    let last_char = self.content.chars().nth(cursor_pos - 1);
+                    if let Some(ch) = last_char {
+                        let to_insert = match ch {
+                            '(' => Some(')'),
+                            '[' => Some(']'),
+                            '{' => Some('}'),
+                            '"' => Some('"'),
+                            '\'' => Some('\''),
+                            _ => None,
+                        };
 
-                            if let Some(closing_char) = to_insert {
-                                self.content.insert(cursor_pos, closing_char);
-                                // Move the cursor back between the pair
-                                if let Some(mut ccursor) = cursor_range.primary.ccursor.clone() {
-                                    ccursor.index = cursor_pos;
-                                    ui.input_mut(|i| i.events.push(egui::Event::Text(closing_char.to_string())));
-                                }
-                            }
+                        if let Some(closing_char) = to_insert {
+                            self.content.insert(cursor_pos, closing_char);
+                            // Move the cursor back between the pair
+                            ui.input_mut(|i| i.events.push(egui::Event::Text(closing_char.to_string())));
                         }
                     }
                 }
@@ -448,13 +448,9 @@ impl eframe::App for TextEditor {
             egui::CentralPanel::default().show(ctx, |ui| {
                 ui.separator();
 
-                let highlighted = self.highlight_content();
+                let _highlighted = self.highlight_content();
                 
                 egui::ScrollArea::vertical().show(ui, |ui| {
-                    let _layouter = |_ui: &egui::Ui, _string: &str, _wrap_width: f32| {
-                        // ... layouter implementation ...
-                    };
-
                     self.show_editor(ui);
 
                     // Vim command line
@@ -464,40 +460,40 @@ impl eframe::App for TextEditor {
                                 VimMode::Normal => {
                                     ui.label("-- NORMAL --");
                                 },
-                                VimMode::Insert => {
-                                    ui.label("-- INSERT --");
-                                },
-                                VimMode::Command => {
-                                    ui.label(":");
-                                    let response = ui.text_edit_singleline(&mut self.vim_command);
-                                    if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                                        // Handle Vim command
-                                        match self.vim_command.as_str() {
-                                            "w" => {
-                                                // Save file
-                                                if let Some(path) = &self.file_path {
-                                                    fs::write(path, &self.content).expect("Unable to write file");
-                                                }
-                                            },
-                                            "q" => {
-                                                // Quit
-                                                std::process::exit(0);
-                                            },
-                                            "wq" => {
-                                                // Save and quit
-                                                if let Some(path) = &self.file_path {
-                                                    fs::write(path, &self.content).expect("Unable to write file");
-                                                }
-                                                std::process::exit(0);
-                                            },
-                                            _ => {
-                                                // Unknown command
-                                            }
-                                        }
-                                        self.vim_state = VimMode::Normal;
-                                        self.vim_command.clear();
-                                    }
-                                },
+                                // VimMode::Insert => {
+                                //     ui.label("-- INSERT --");
+                                // },
+                                // VimMode::Command => {
+                                //     ui.label(":");
+                                //     let response = ui.text_edit_singleline(&mut self.vim_command);
+                                //     if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                                //         // Handle Vim command
+                                //         match self.vim_command.as_str() {
+                                //             "w" => {
+                                //                 // Save file
+                                //                 if let Some(path) = &self.file_path {
+                                //                     fs::write(path, &self.content).expect("Unable to write file");
+                                //                 }
+                                //             },
+                                //             "q" => {
+                                //                 // Quit
+                                //                 std::process::exit(0);
+                                //             },
+                                //             "wq" => {
+                                //                 // Save and quit
+                                //                 if let Some(path) = &self.file_path {
+                                //                     fs::write(path, &self.content).expect("Unable to write file");
+                                //                 }
+                                //                 std::process::exit(0);
+                                //             },
+                                //             _ => {
+                                //                 // Unknown command
+                                //             }
+                                //         }
+                                //         self.vim_state = VimMode::Normal;
+                                //         self.vim_command.clear();
+                                //     }
+                                // },
                             }
                         });
                     }
