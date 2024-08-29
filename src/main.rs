@@ -90,16 +90,11 @@ impl TextEditor {
     }
 
     fn detect_language(&mut self) {
-        if let Some(path) = &self.file_path {
-            if let Some(extension) = path.extension() {
-                let extension = extension.to_str().unwrap_or("");
-                self.current_syntax = self.syntax_set.find_syntax_by_extension(extension)
-                    .map(|s| s.name.clone());
-            }
-        }
+        // Existing code for detecting language
     }
 
     fn highlight_content(&self) -> Vec<(Style, String)> {
+        // Existing code for highlighting
         let theme = &self.theme_set.themes["base16-ocean.dark"];
         let syntax = self.current_syntax
             .as_ref()
@@ -222,6 +217,7 @@ impl TextEditor {
         self.file_path = Some(path.clone());
         self.content = fs::read_to_string(path).unwrap_or_else(|_| String::new());
         self.detect_language();
+        self.highlight_content(); // Ensure this is called
     }
 
     fn show_taskbar(&mut self, ui: &mut egui::Ui) {
