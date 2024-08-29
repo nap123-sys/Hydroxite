@@ -9,8 +9,8 @@ use syntect::util::LinesWithEndings;
 
 enum VimMode {
     Normal,
-    Insert,
-    Command,
+    // Insert,
+    // Command,
 }
 
 struct SplashScreen {
@@ -34,7 +34,6 @@ struct TextEditor {
     splash_screen: SplashScreen,
     vim_mode: bool,
     vim_state: VimMode,
-    vim_command: String,
     current_dir: Option<PathBuf>,
     selected_file: Option<PathBuf>,
     expanded_folders: HashMap<PathBuf, bool>,
@@ -42,9 +41,9 @@ struct TextEditor {
     new_item_name: String,
     creating_new_item: Option<bool>,
     refresh_tree: bool,
-    icons: HashMap<String, String>,
     show_about: bool,
     version: String,
+    rust_icon: Option<egui::TextureHandle>,
 }
 
 impl Default for TextEditor {
@@ -58,7 +57,6 @@ impl Default for TextEditor {
             splash_screen: SplashScreen::default(),
             vim_mode: false,
             vim_state: VimMode::Normal,
-            vim_command: String::new(),
             current_dir: None,
             selected_file: None,
             expanded_folders: HashMap::new(),
@@ -66,24 +64,31 @@ impl Default for TextEditor {
             new_item_name: String::new(),
             creating_new_item: None,
             refresh_tree: false,
-            icons: load_icons(),
             show_about: false,
             version: env!("CARGO_PKG_VERSION").to_string(),
+            rust_icon: None,
         }
     }
 }
 
-fn load_icons() -> HashMap<String, String> {
-    let mut icons = HashMap::new();
-    icons.insert("file".to_string(), "📄".to_string());
-    icons.insert("folder".to_string(), "📁".to_string());
-    icons.insert("folder-open".to_string(), "📂".to_string());
-    icons.insert("refresh".to_string(), "🔄".to_string());
-    println!("Loaded icons: {:?}", icons); // Debug print
-    icons
-}
-
 impl TextEditor {
+    fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        let mut editor = Self::default();
+        editor.load_rust_icon(cc);
+        editor
+    }
+
+    fn load_rust_icon(&mut self, cc: &eframe::CreationContext<'_>) {
+        let rust_icon_path = PathBuf::from("Rust.png");
+        if rust_icon_path.exists() {
+            let image = image::open(rust_icon_path).expect("Failed to open Rust.png");
+            let image_buffer = image.to_rgba8();
+            let size = [image.width() as _, image.height() as _];
+            let image_data = egui::ColorImage::from_rgba_unmultiplied(size, image_buffer.as_flat_samples().as_slice());
+            self.rust_icon = Some(cc.egui_ctx.load_texture("rust-icon", image_data, Default::default()));
+        }
+    }
+
     fn detect_language(&mut self) {
         if let Some(path) = &self.file_path {
             if let Some(extension) = path.extension() {
@@ -115,12 +120,8 @@ impl TextEditor {
     fn show_file_tree(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.heading("File Explorer");
-            if let Some(refresh_icon) = self.icons.get("refresh") {
-                if ui.button(refresh_icon).clicked() {
-                    self.refresh_tree = true;
-                }
-            } else {
-                println!("Refresh icon not found!"); // Debug print
+            if ui.button("🔄").clicked() {
+                self.refresh_tree = true;
             }
         });
 
@@ -182,49 +183,45 @@ impl TextEditor {
         for entry in entries.filter_map(|e| e.ok()) {
             let path = entry.path();
             let name = path.file_name().unwrap_or_default().to_string_lossy();
+            let is_dir = path.is_dir();
 
             ui.horizontal(|ui| {
                 ui.add_space((depth * 20) as f32);
-                if path.is_dir() {
-                    let is_expanded = self.expanded_folders.entry(path.clone()).or_insert(false);
-                    let icon_key = if *is_expanded { "folder-open" } else { "folder" };
-                    if let Some(icon) = self.icons.get(icon_key) {
-                        if ui.button(icon).clicked() {
-                            *is_expanded = !*is_expanded;
-                        }
-                    } else {
-                        println!("Folder icon not found: {}", icon_key); // Debug print
-                    }
-                    ui.label(&*name);
-                    if ui.rect_contains_pointer(ui.min_rect()) && ui.input(|i| i.pointer.secondary_clicked()) {
-                        if let Some(pos) = ui.ctx().pointer_hover_pos() {
-                            self.context_menu = Some((path.clone(), pos));
-                        }
-                    }
-                    if *is_expanded {
-                        ui.end_row();
-                        self.show_folder_contents(ui, &path, depth + 1);
-                    }
+                let is_rust_file = path.extension().map_or(false, |ext| ext == "rs");
+
+                // Add icon
+                if is_dir {
+                    ui.label(if *self.expanded_folders.get(&path).unwrap_or(&false) { "▼" } else { "▶" });
+                } else if is_rust_file && self.rust_icon.is_some() {
+                    let rust_icon = self.rust_icon.as_ref().unwrap();
+                    ui.image(rust_icon);
                 } else {
-                    if let Some(file_icon) = self.icons.get("file") {
-                        if ui.button(file_icon).clicked() {
-                            self.selected_file = Some(path.clone());
-                            self.file_path = Some(path.clone());
-                            self.content = fs::read_to_string(&path).unwrap_or_else(|_| String::new());
-                            self.detect_language();
-                        }
+                    ui.label("  "); // Spacer for other file types
+                }
+
+                // Add button with file/folder name
+                let is_selected = self.selected_file.as_ref() == Some(&path);
+                if ui.add(egui::SelectableLabel::new(is_selected, name.to_string())).clicked() {
+                    if is_dir {
+                        let is_expanded = self.expanded_folders.entry(path.clone()).or_insert(false);
+                        *is_expanded = !*is_expanded;
                     } else {
-                        println!("File icon not found!"); // Debug print
-                    }
-                    ui.label(&*name);
-                    if ui.rect_contains_pointer(ui.min_rect()) && ui.input(|i| i.pointer.secondary_clicked()) {
-                        if let Some(pos) = ui.ctx().pointer_hover_pos() {
-                            self.context_menu = Some((path.clone(), pos));
-                        }
+                        self.load_file(&path);
                     }
                 }
             });
+
+            if is_dir && *self.expanded_folders.get(&path).unwrap_or(&false) {
+                self.show_folder_contents(ui, &path, depth + 1);
+            }
         }
+    }
+
+    fn load_file(&mut self, path: &PathBuf) {
+        self.selected_file = Some(path.clone());
+        self.file_path = Some(path.clone());
+        self.content = fs::read_to_string(path).unwrap_or_else(|_| String::new());
+        self.detect_language();
     }
 
     fn show_taskbar(&mut self, ui: &mut egui::Ui) {
@@ -369,6 +366,45 @@ impl TextEditor {
             self.refresh_tree = true;
         }
     }
+
+    fn show_editor(&mut self, ui: &mut egui::Ui) {
+        let editor = egui::TextEdit::multiline(&mut self.content)
+            .desired_width(f32::INFINITY)
+            .font(egui::TextStyle::Monospace);
+
+        let response = ui.add(editor);
+
+        if response.changed() {
+            // Get the cursor position from the UI state
+            if let Some(cursor_pos) = ui.input(|i| i.events.iter().find_map(|e| {
+                if let egui::Event::Text(_text) = e {
+                    Some(self.content.len())
+                } else {
+                    None
+                }
+            })) {
+                if cursor_pos > 0 {
+                    let last_char = self.content.chars().nth(cursor_pos - 1);
+                    if let Some(ch) = last_char {
+                        let to_insert = match ch {
+                            '(' => Some(')'),
+                            '[' => Some(']'),
+                            '{' => Some('}'),
+                            '"' => Some('"'),
+                            '\'' => Some('\''),
+                            _ => None,
+                        };
+
+                        if let Some(closing_char) = to_insert {
+                            self.content.insert(cursor_pos, closing_char);
+                            // Move the cursor back between the pair
+                            ui.input_mut(|i| i.events.push(egui::Event::Text(closing_char.to_string())));
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl eframe::App for TextEditor {
@@ -412,110 +448,61 @@ impl eframe::App for TextEditor {
             egui::CentralPanel::default().show(ctx, |ui| {
                 ui.separator();
 
-                let highlighted = self.highlight_content();
+                let _highlighted = self.highlight_content();
                 
                 egui::ScrollArea::vertical().show(ui, |ui| {
-                    let mut layouter = |ui: &egui::Ui, string: &str, _wrap_width: f32| {
-                        let mut job = egui::text::LayoutJob::default();
-                        let mut start = 0;
-                        for (style, text) in &highlighted {
-                            let end = start + text.len();
-                            if end > string.len() {
-                                break;
-                            }
-                            let color = egui::Color32::from_rgb(style.foreground.r, style.foreground.g, style.foreground.b);
-                            job.append(&string[start..end], 0.0, egui::TextFormat::simple(ui.style().text_styles[&egui::TextStyle::Monospace].clone(), color));
-                            start = end;
-                        }
-                        if start < string.len() {
-                            job.append(&string[start..], 0.0, egui::TextFormat::simple(ui.style().text_styles[&egui::TextStyle::Monospace].clone(), egui::Color32::WHITE));
-                        }
-                        ui.fonts(|f| f.layout_job(job))
-                    };
+                    self.show_editor(ui);
 
-                    let text_edit = egui::TextEdit::multiline(&mut self.content)
-                        .desired_width(f32::INFINITY)
-                        .desired_rows(30)
-                        .font(egui::TextStyle::Monospace)
-                        .layouter(&mut layouter);
-
-                    // Apply Vim mode if enabled
+                    // Vim command line
                     if self.vim_mode {
-                        match self.vim_state {
-                            VimMode::Normal => {
-                                ui.add(text_edit.interactive(false));
-                                if ui.input(|i| i.key_pressed(egui::Key::I)) {
-                                    self.vim_state = VimMode::Insert;
-                                }
-                                if ui.input(|i| i.key_pressed(egui::Key::Colon)) {
-                                    self.vim_state = VimMode::Command;
-                                    self.vim_command.clear();
-                                }
-                            },
-                            VimMode::Insert => {
-                                ui.add(text_edit);
-                                if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
-                                    self.vim_state = VimMode::Normal;
-                                }
-                            },
-                            VimMode::Command => {
-                                ui.add(text_edit.interactive(false));
-                            },
-                        }
-                    } else {
-                        ui.add(text_edit);
+                        ui.horizontal(|ui| {
+                            match self.vim_state {
+                                VimMode::Normal => {
+                                    ui.label("-- NORMAL --");
+                                },
+                                // VimMode::Insert => {
+                                //     ui.label("-- INSERT --");
+                                // },
+                                // VimMode::Command => {
+                                //     ui.label(":");
+                                //     let response = ui.text_edit_singleline(&mut self.vim_command);
+                                //     if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                                //         // Handle Vim command
+                                //         match self.vim_command.as_str() {
+                                //             "w" => {
+                                //                 // Save file
+                                //                 if let Some(path) = &self.file_path {
+                                //                     fs::write(path, &self.content).expect("Unable to write file");
+                                //                 }
+                                //             },
+                                //             "q" => {
+                                //                 // Quit
+                                //                 std::process::exit(0);
+                                //             },
+                                //             "wq" => {
+                                //                 // Save and quit
+                                //                 if let Some(path) = &self.file_path {
+                                //                     fs::write(path, &self.content).expect("Unable to write file");
+                                //                 }
+                                //                 std::process::exit(0);
+                                //             },
+                                //             _ => {
+                                //                 // Unknown command
+                                //             }
+                                //         }
+                                //         self.vim_state = VimMode::Normal;
+                                //         self.vim_command.clear();
+                                //     }
+                                // },
+                            }
+                        });
+                    }
+
+                    // Update highlighting when text changes
+                    if ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                        self.detect_language();
                     }
                 });
-
-                // Vim command line
-                if self.vim_mode {
-                    ui.horizontal(|ui| {
-                        match self.vim_state {
-                            VimMode::Normal => {
-                                ui.label("-- NORMAL --");
-                            },
-                            VimMode::Insert => {
-                                ui.label("-- INSERT --");
-                            },
-                            VimMode::Command => {
-                                ui.label(":");
-                                let response = ui.text_edit_singleline(&mut self.vim_command);
-                                if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                                    // Handle Vim command
-                                    match self.vim_command.as_str() {
-                                        "w" => {
-                                            // Save file
-                                            if let Some(path) = &self.file_path {
-                                                fs::write(path, &self.content).expect("Unable to write file");
-                                            }
-                                        },
-                                        "q" => {
-                                            // Quit
-                                            std::process::exit(0);
-                                        },
-                                        "wq" => {
-                                            // Save and quit
-                                            if let Some(path) = &self.file_path {
-                                                fs::write(path, &self.content).expect("Unable to write file");
-                                            }
-                                            std::process::exit(0);
-                                        },
-                                        _ => {
-                                            // Unknown command
-                                        }
-                                    }
-                                    self.vim_state = VimMode::Normal;
-                                    self.vim_command.clear();
-                                }
-                            },
-                        }
-                    });
-                }
-
-                // Update highlighting when text changes
-                if ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                    self.detect_language();
-                }
             });
         }
 
@@ -538,6 +525,6 @@ fn main() -> Result<(), eframe::Error> {
     eframe::run_native(
         "Hydroxite",
         options,
-        Box::new(|_cc| Box::new(TextEditor::default())),
+        Box::new(|cc| Box::new(TextEditor::new(cc))),
     )
 }
