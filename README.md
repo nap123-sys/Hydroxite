@@ -59,4 +59,3 @@ This project is licensed under the Creative Commons CC0 1.0 Universal License - 
 - Special thanks to cursor.com AI for development assistance.
 - Gratitude to all contributors and users of Hydroxite.
 
-(this was also made with cursor.com ai :P )
