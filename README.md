@@ -12,7 +12,7 @@ Hydroxite is a modern, feature-rich text editor designed to enhance your coding 
 - **Vim Mode**: For those who love the efficiency of Vim keybindings.
 - **File Explorer**: Easily navigate and manage your project files.
 - **Customizable Themes**: Choose from various themes to suit your preferences.
-- **Cross-Platform**: Works on Windows
+- **Cross-Platform**: Works on Windows and Linux
 
 ## Getting Started
 
@@ -34,6 +34,30 @@ Hydroxite is a modern, feature-rich text editor designed to enhance your coding 
    ```
 
 3. Run Hydroxite:
+   ```
+   cargo run --release
+   ```
+
+### Linux Installation
+
+1. Ensure you have the necessary dependencies installed:
+   ```
+   sudo apt-get update
+   sudo apt-get install build-essential libssl-dev
+   ```
+
+2. Clone the repository:
+   ```
+   git clone https://github.com/yourusername/hydroxite.git
+   cd hydroxite
+   ```
+
+3. Build the project:
+   ```
+   cargo build --release
+   ```
+
+4. Run Hydroxite:
    ```
    cargo run --release
    ```
