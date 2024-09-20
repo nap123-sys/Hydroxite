@@ -12,6 +12,7 @@ Hydroxite is a modern, feature-rich text editor designed to enhance your coding 
 - **Vim Mode**: For those who love the efficiency of Vim keybindings.
 - **File Explorer**: Easily navigate and manage your project files.
 - **Customizable Themes**: Choose from various themes to suit your preferences.
+
 - **Cross-Platform**: Works on Windows and Linux
 
 ## Getting Started
@@ -80,6 +81,5 @@ This project is licensed under the Creative Commons CC0 1.0 Universal License - 
 ## Acknowledgments
 
 - Thanks to the Rust community for the amazing language and tools.
-- Special thanks to cursor.com AI for development assistance.
 - Gratitude to all contributors and users of Hydroxite.
 
