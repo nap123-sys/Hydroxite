@@ -11,6 +11,9 @@ rfd = "0.13.0"
 syntect = "5.1.0"
 walkdir = "2.3.3"
 image = { version = "0.24", features = ["png"] }
+reqwest = { version = "0.11", features = ["json"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 # i want to fricking die
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3.9", features = ["winuser", "windef"] }
