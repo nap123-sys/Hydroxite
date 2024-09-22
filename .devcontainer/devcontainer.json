@@ -1,5 +1,6 @@
 {
   "tasks": {
-    "launch": "cargo run --release"
+    "launch": "cargo run --release",
+    "test": "cargo test"
   }
 }

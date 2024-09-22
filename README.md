@@ -45,6 +45,15 @@ Hydroxite is a modern, feature-rich text editor designed to enhance your coding 
 - Toggle Vim mode in the settings if desired.
 - Enjoy coding with syntax highlighting and other features!
 
+## AI Prompt Feature
+
+Hydroxite now includes an AI prompt feature that allows you to generate code snippets using OpenAI's API. To use this feature:
+
+1. Press `Ctrl + I` to open the AI prompt dialog.
+2. Enter your OpenAI API key and the prompt for the code snippet you want to generate.
+3. Click "Generate" to fetch the AI-generated code snippet.
+4. The generated code snippet will be displayed in the editor.
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
