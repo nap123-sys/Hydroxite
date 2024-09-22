@@ -6,6 +6,8 @@ use syntect::easy::HighlightLines;
 use syntect::highlighting::{ThemeSet, Style};
 use syntect::parsing::SyntaxSet;
 use syntect::util::LinesWithEndings;
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
 
 enum VimMode {
     Normal,
@@ -44,6 +46,8 @@ struct TextEditor {
     show_about: bool,
     version: String,
     rust_icon: Option<egui::TextureHandle>,
+    ai_config: AIConfig,
+    ai_response: Option<String>,
 }
 
 impl Default for TextEditor {
@@ -67,6 +71,8 @@ impl Default for TextEditor {
             show_about: false,
             version: env!("CARGO_PKG_VERSION").to_string(),
             rust_icon: None,
+            ai_config: AIConfig::default(),
+            ai_response: None,
         }
     }
 }
@@ -400,6 +406,37 @@ impl TextEditor {
                 }
             }
         }
+
+        if let Some(ai_response) = &self.ai_response {
+            ui.label(ai_response);
+        }
+    }
+
+    fn show_ai_prompt_dialog(&mut self, ctx: &egui::Context) {
+        egui::Window::new("AI Prompt")
+            .resizable(false)
+            .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label("API Key:");
+                    ui.text_edit_singleline(&mut self.ai_config.api_key);
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Prompt:");
+                    ui.text_edit_singleline(&mut self.ai_config.prompt);
+                });
+                ui.horizontal(|ui| {
+                    if ui.button("Generate").clicked() {
+                        let api_key = self.ai_config.api_key.clone();
+                        let prompt = self.ai_config.prompt.clone();
+                        let client = Client::new();
+                        let response = fetch_ai_response(&client, &api_key, &prompt);
+                        self.ai_response = Some(response);
+                    }
+                    if ui.button("Cancel").clicked() {
+                        self.ai_config.prompt.clear();
+                    }
+                });
+            });
     }
 }
 
@@ -509,7 +546,36 @@ impl eframe::App for TextEditor {
         if let Some(is_file) = self.creating_new_item {
             self.show_new_item_dialog(ctx, is_file);
         }
+
+        if ctx.input(|i| i.key_pressed(egui::Key::I) && i.modifiers.ctrl) {
+            self.show_ai_prompt_dialog(ctx);
+        }
     }
+}
+
+#[derive(Default, Serialize, Deserialize)]
+struct AIConfig {
+    api_key: String,
+    prompt: String,
+}
+
+async fn fetch_ai_response(client: &Client, api_key: &str, prompt: &str) -> String {
+    let url = "https://api.openai.com/v1/engines/davinci-codex/completions";
+    let params = serde_json::json!({
+        "prompt": prompt,
+        "max_tokens": 100,
+    });
+
+    let response = client
+        .post(url)
+        .header("Authorization", format!("Bearer {}", api_key))
+        .json(&params)
+        .send()
+        .await
+        .expect("Failed to send request");
+
+    let response_json: serde_json::Value = response.json().await.expect("Failed to parse response");
+    response_json["choices"][0]["text"].as_str().unwrap_or("").to_string()
 }
 
 fn main() -> Result<(), eframe::Error> {
